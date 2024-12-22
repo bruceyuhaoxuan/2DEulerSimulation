@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -19,7 +19,7 @@ namespace EulerSimulation
         double[,] b = new double[GridSize, GridSize]; // for Poisson Equation used for calculating pressure
 
         // Time step and grid spacing
-        double dt = 0.01;
+        double dt = 0.001;
         double dx = 1;
 
         // Visualization variables
@@ -73,7 +73,7 @@ namespace EulerSimulation
                 {
                     rho[i, j] = 1.225; // Uniform density
                     // S[i, j] = 3796.0; // Uniform entropy
-                    this.j[i, j] = new Vector2(1, 0); // Zero initial momentum
+                    this.j[i, j] = new Vector2(10, 0); // Zero initial momentum
                     pressure[i, j] = 101.3; // Uniform pressure
                     externalForce[i, j] = new Vector2(0, 9.81); // Gravity: (0, 9.81)
                     b[i, j] = 0;
@@ -103,8 +103,8 @@ namespace EulerSimulation
                     rho[j, i] = 1.25;
                     pressure[j, GridSize - 1 - i] = 99.6;
                     rho[j, GridSize - 1 - i] = 1.25;
-                    this.j[j, i] = new Vector2(-1, 0);
-                    this.j[j, GridSize - 1 - i] = new Vector2(-1, 0);
+                    this.j[j, i] = new Vector2(-10, 0);
+                    this.j[j, GridSize - 1 - i] = new Vector2(-10, 0);
                 }
 
             for (int i = 50; i < GridSize - 1; i++)
@@ -141,9 +141,33 @@ namespace EulerSimulation
             Double[,] nrho = new Double[GridSize, GridSize];
             // Double[,] ns = new Double[GridSize, GridSize];
             // Calculate new states
+            // Calculate new pressure based on Poisson's Equation
             for (int i = 1; i < GridSize - 1; i++)
             {
                 for (int j = 1; j < GridSize - 1; j++)
+                {
+                    np[i, j] = (pressure[i + 1, j] + pressure[i - 1, j]
+                                + pressure[i, j + 1] + pressure[i, j - 1] - b[i, j] * dx) / 4.0;
+                }
+            }
+            // Update pressure
+            for (int i = 1; i < GridSize - 1; i++)
+            {
+                for (int j = 1; j < GridSize - 1; j++)
+                {
+                    pressure[i, j] = np[i, j];
+                }
+            }
+            // Calculate new j by Eulerian form of Euler Equations using RK4 method for more accurate approximation
+            Vector2[,] m = new Vector2[GridSize, GridSize];
+            Vector2[,] m1 = new Vector2[GridSize, GridSize];
+            Vector2[,] m2 = new Vector2[GridSize, GridSize];
+            Vector2[,] m3 = new Vector2[GridSize, GridSize];
+            Vector2[,] m4 = new Vector2[GridSize, GridSize];
+            // Calculate m1 = f(tn, xn), nj = xn + m1 * h / 2
+            for (int i = 0; i < GridSize - 1; i++)
+            {
+                for (int j = 0; j < GridSize - 1; j++)
                 {
                     double flux_x = Math.Pow(this.j[i + 1, j].X, 2) / rho[i + 1, j]
                                   + this.j[i, j + 1].X * this.j[i, j + 1].Y / rho[i, j + 1]
@@ -155,15 +179,119 @@ namespace EulerSimulation
                                   - Math.Pow(this.j[i, j].Y, 2) / rho[i, j]
                                   - this.j[i, j].X * this.j[i, j].Y / rho[i, j]
                                   + pressure[i, j + 1] - pressure[i, j];
-                    np[i, j] = (pressure[i + 1, j] + pressure[i - 1, j] + pressure[i, j + 1] + pressure[i, j - 1] - b[i, j] * dx) / 4.0;
-                    nj[i, j].X = this.j[i, j].X + externalForce[i, j].X * rho[i, j] * dt - dt / dx * flux_x;
-                    nj[i, j].Y = this.j[i, j].Y + externalForce[i, j].Y * rho[i, j] * dt - dt / dx * flux_y;
-                    nrho[i, j] = rho[i, j] - dt / dx * (this.j[i + 1, j].X + this.j[i, j + 1].Y
+                    m1[i, j].X = externalForce[i, j].X * rho[i, j] - flux_x / dx;
+                    m1[i, j].Y = externalForce[i, j].Y * rho[i, j] - flux_y / dx;
+                    nj[i, j].X = this.j[i, j].X + m1[i, j].X * dt / 2;
+                    nj[i, j].Y = this.j[i, j].Y + m1[i, j].Y * dt / 2;
+                    /* nrho[i, j] = rho[i, j] - dt / dx * (this.j[i + 1, j].X + this.j[i, j + 1].Y
                                                         - this.j[i, j].X - this.j[i, j].Y);
                     /* ns[i, j] = S[i, j] - dt / dx * (S[i + 1, j] * this.j[i + 1, j].X / rho[i + 1, j]
                                                     + S[i, j + 1] * this.j[i, j + 1].Y / rho[i, j + 1]
                                                     - S[i, j] * this.j[i, j].X / rho[i, j]
                                                     - S[i, j] * this.j[i, j].Y / rho[i, j]);*/
+                }
+            }
+            // Calculate m2 = f(tn + h / 2, xn + m1 * h / 2), nj = xn + m2 * h / 2
+            for (int i = 0; i < GridSize - 1; i++)
+            {
+                for (int j = 0; j < GridSize - 1; j++)
+                {
+                    double flux_x = Math.Pow(nj[i + 1, j].X, 2) / rho[i + 1, j]
+                                  + nj[i, j + 1].X * nj[i, j + 1].Y / rho[i, j + 1]
+                                  - Math.Pow(nj[i, j].X, 2) / rho[i, j]
+                                  - nj[i, j].X * nj[i, j].Y / rho[i, j]
+                                  + pressure[i + 1, j] - pressure[i, j];
+                    double flux_y = Math.Pow(nj[i, j + 1].Y, 2) / rho[i, j + 1]
+                                  + nj[i + 1, j].X * nj[i + 1, j].Y / rho[i + 1, j]
+                                  - Math.Pow(nj[i, j].Y, 2) / rho[i, j]
+                                  - nj[i, j].X * nj[i, j].Y / rho[i, j]
+                                  + pressure[i, j + 1] - pressure[i, j];
+                    m2[i, j].X = externalForce[i, j].X * rho[i, j] - flux_x / dx;
+                    m2[i, j].Y = externalForce[i, j].Y * rho[i, j] - flux_y / dx;
+                }
+            }
+            for (int i = 0; i < GridSize - 1; i++)
+            {
+                for (int j = 0; j < GridSize - 1; j++)
+                {
+                    nj[i, j].X = this.j[i, j].X + m2[i, j].X * dt / 2;
+                    nj[i, j].Y = this.j[i, j].Y + m2[i, j].Y * dt / 2;
+                }
+            }
+            // Calculate m3 = f(tn + h / 2, xn + m2 * h / 2), nj = xn + m3 * h
+            for (int i = 0; i < GridSize - 1; i++)
+            {
+                for (int j = 0; j < GridSize - 1; j++)
+                {
+                    double flux_x = Math.Pow(nj[i + 1, j].X, 2) / rho[i + 1, j]
+                                  + nj[i, j + 1].X * nj[i, j + 1].Y / rho[i, j + 1]
+                                  - Math.Pow(nj[i, j].X, 2) / rho[i, j]
+                                  - nj[i, j].X * nj[i, j].Y / rho[i, j]
+                                  + pressure[i + 1, j] - pressure[i, j];
+                    double flux_y = Math.Pow(nj[i, j + 1].Y, 2) / rho[i, j + 1]
+                                  + nj[i + 1, j].X * nj[i + 1, j].Y / rho[i + 1, j]
+                                  - Math.Pow(nj[i, j].Y, 2) / rho[i, j]
+                                  - nj[i, j].X * nj[i, j].Y / rho[i, j]
+                                  + pressure[i, j + 1] - pressure[i, j];
+                    m3[i, j].X = externalForce[i, j].X * rho[i, j] - flux_x / dx;
+                    m3[i, j].Y = externalForce[i, j].Y * rho[i, j] - flux_y / dx;
+                }
+            }
+            for (int i = 0; i < GridSize - 1; i++)
+            {
+                for (int j = 0; j < GridSize - 1; j++)
+                {
+                    nj[i, j].X = this.j[i, j].X + m3[i, j].X * dt;
+                    nj[i, j].Y = this.j[i, j].Y + m3[i, j].Y * dt;
+                }
+            }
+            // Calculate m4 = f(tn + h, xn + m3 * h)
+            for (int i = 0; i < GridSize - 1; i++)
+            {
+                for (int j = 0; j < GridSize - 1; j++)
+                {
+                    double flux_x = Math.Pow(nj[i + 1, j].X, 2) / rho[i + 1, j]
+                                  + nj[i, j + 1].X * nj[i, j + 1].Y / rho[i, j + 1]
+                                  - Math.Pow(nj[i, j].X, 2) / rho[i, j]
+                                  - nj[i, j].X * nj[i, j].Y / rho[i, j]
+                                  + pressure[i + 1, j] - pressure[i, j];
+                    double flux_y = Math.Pow(nj[i, j + 1].Y, 2) / rho[i, j + 1]
+                                  + nj[i + 1, j].X * nj[i + 1, j].Y / rho[i + 1, j]
+                                  - Math.Pow(nj[i, j].Y, 2) / rho[i, j]
+                                  - nj[i, j].X * nj[i, j].Y / rho[i, j]
+                                  + pressure[i, j + 1] - pressure[i, j];
+                    m4[i, j].X = externalForce[i, j].X * rho[i, j] - flux_x / dx;
+                    m4[i, j].Y = externalForce[i, j].Y * rho[i, j] - flux_y / dx;
+                }
+            }
+            // Calculate m = (1 / 6) * (m1 + 2 * m2 + 2 * m3 + m4)
+            for (int i = 0; i < GridSize - 1; i++)
+            {
+                for (int j = 0; j < GridSize - 1; j++)
+                {
+                    m[i, j].X = m1[i, j].X / 6 + m2[i, j].X / 3 + m3[i, j].X / 3 + m4[i, j].X / 6;
+                    m[i, j].Y = m1[i, j].Y / 6 + m2[i, j].Y / 3 + m3[i, j].Y / 3 + m4[i, j].Y / 6;
+                }
+            }
+            // Calculate x(n+1) = x(n) + h * m, update j
+            for (int i = 0; i < GridSize - 1; i++)
+            {
+                for (int j = 0; j < GridSize - 1; j++)
+                {
+                    nj[i, j].X = this.j[i, j].X + m[i, j].X * dt;
+                    nj[i, j].Y = this.j[i, j].Y + m[i, j].Y * dt;
+                    this.j[i, j].X = nj[i, j].X;
+                    this.j[i, j].Y = nj[i, j].Y;
+                }
+            }
+            // Use the updated j to calculate and update rho
+            for (int i = 0; i < GridSize - 1; i++)
+            {
+                for (int j = 0; j < GridSize - 1; j++)
+                {
+                    nrho[i, j] = rho[i, j] - (this.j[i + 1, j].X + this.j[i, j + 1].Y
+                                           - this.j[i, j].X - this.j[i, j].Y) / dx * dt;
+                    rho[i, j] = nrho[i, j];
                 }
             }
             /*
@@ -193,7 +321,7 @@ namespace EulerSimulation
                 }
             }
              */
-            // Update states
+            /* Update states
             for (int i = 1; i < GridSize - 1; i++)
             {
                 for (int j = 1; j < GridSize - 1; j++)
@@ -203,7 +331,7 @@ namespace EulerSimulation
                     rho[i, j] = nrho[i, j];
                     // S[i, j] = ns[i, j];
                 }
-            }
+            }*/
             // Update visualization
             for (int i = 0; i < GridSize; i++)
             {
@@ -229,9 +357,6 @@ namespace EulerSimulation
 
             // Vector scalar multiplication
             public static Vector2 operator *(Vector2 a, double scalar) => new Vector2(a.X * scalar, a.Y * scalar);
-
-            // Vector tensor product
-            public static Vector2 operator *(Vector2 a, Vector2 b) => new Vector2(a.X * b.Y, a.Y * b.X);
         }
 
         // Map value to color
