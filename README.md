@@ -10,7 +10,7 @@ Updates:
 
 v0.0.3-alpha-fix
 
-Fixes major bug on Poisson's Equation. Now there are 100 iterations for each dt seconds to ensure that the pressure reaches pseudo-quasilinear state before proceeding into the calculation of J and $\rho$. I also fix the error on the calculation of b. The code should now work fine for incompressible fluids without shock waves, a feature lacking for Finite Difference Methods. As you see in the demo, the pressure builds up and initiates a shock-like action in the middle of the shaped edge. And because of the lacking nature of Finite Difference Methods on simulating results with close-to-discontinuous waves, the error on approximating density and pressure builds up exponentially, causing a all-blue screen at the end, which violates the law of conservation and, of course, does not occur in real life. 
+Fixes major bug on Poisson's Equation part in the program for accurate pressure calculation. Now there are 100 iterations for each dt seconds to ensure that the pressure reaches pseudo-quasilinear state before proceeding into the calculation of J and $\rho$. I also fix the error on the calculation of b. The code should now work fine for incompressible fluids without shock waves, a feature lacking for Finite Difference Methods. As you see in the demo, the pressure builds up and initiates a shock-like action in the middle of the shaped edge. And because of the lacking nature of Finite Difference Methods on simulating results with close-to-discontinuous waves, the error on approximating density and pressure builds up exponentially, causing a all-blue screen at the end, which violates the law of conservation and, of course, does not occur in real life. 
 
 Ready to do:
 
