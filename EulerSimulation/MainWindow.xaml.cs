@@ -82,10 +82,22 @@ namespace EulerSimulation
             // Outside boundary
             for (int i = 0; i < GridSize; i++)
             {
-                b[0, i] = 1000.0;
-                b[i, 0] = 1000.0;
-                b[GridSize - 1, i] = 1000.0;
-                b[i, GridSize - 1] = 1000.0;
+                this.j[i, 0] = new Vector2(0, 0);
+                this.j[0, i] = new Vector2(0, 0);
+                this.j[i, GridSize - 1] = new Vector2(0, 0);
+                this.j[GridSize - 1, i] = new Vector2(0, 0);
+                pressure[i, 0] = 0;
+                pressure[0, i] = 0;
+                pressure[i, GridSize - 1] = 0;
+                pressure[GridSize - 1, i] = 0;
+                externalForce[i, 0] = new Vector2(0, 0);
+                externalForce[0, i] = new Vector2(0, 0);
+                externalForce[i, GridSize - 1] = new Vector2(0, 0);
+                externalForce[GridSize - 1, i] = new Vector2(0, 0);
+                //b[0, i] = 1000.0;
+                //b[i, 0] = 1000.0;
+                //b[GridSize - 1, i] = 1000.0;
+                //b[i, GridSize - 1] = 1000.0;
             }
             /*
             for (int i = 1; i < GridSize - 1; i++)
@@ -142,20 +154,36 @@ namespace EulerSimulation
             // Double[,] ns = new Double[GridSize, GridSize];
             // Calculate new states
             // Calculate new pressure based on Poisson's Equation
-            for (int i = 1; i < GridSize - 1; i++)
+            // Calculate b
+            for (int i = 0; i < GridSize - 1; i++)
             {
-                for (int j = 1; j < GridSize - 1; j++)
+                for (int j = 0; j < GridSize - 1; j++)
                 {
-                    np[i, j] = (pressure[i + 1, j] + pressure[i - 1, j]
-                                + pressure[i, j + 1] + pressure[i, j - 1] - b[i, j] * dx) / 4.0;
+                    b[i, j] = rho[i, j] * 
+                            (Math.Pow(this.j[i + 1, j].X / rho[i + 1, j] - this.j[i, j].X / rho[i, j], 2)
+                             + 2 * ((this.j[i, j + 1].X / rho[i, j + 1]) - (this.j[i, j].X / rho[i, j]))
+                             * ((this.j[i + 1, j].Y / rho[i + 1, j]) - (this.j[i, j].Y / rho[i, j]))
+                             + Math.Pow(this.j[i, j + 1].Y / rho[i, j + 1] - this.j[i, j].Y / rho[i, j], 2));
                 }
             }
-            // Update pressure
-            for (int i = 1; i < GridSize - 1; i++)
+            // Calculate pressure for 100 iterations until it reaches quasilinear state
+            for (int z = 0; z < 100; z++)
             {
-                for (int j = 1; j < GridSize - 1; j++)
+                for (int i = 1; i < GridSize - 1; i++)
                 {
-                    pressure[i, j] = np[i, j];
+                    for (int j = 1; j < GridSize - 1; j++)
+                    {
+                        np[i, j] = (pressure[i + 1, j] + pressure[i - 1, j]
+                                    + pressure[i, j + 1] + pressure[i, j - 1] + b[i, j] * dx) / 4.0;
+                    }
+                }
+                // Update pressure
+                for (int i = 1; i < GridSize - 1; i++)
+                {
+                    for (int j = 1; j < GridSize - 1; j++)
+                    {
+                        pressure[i, j] = np[i, j];
+                    }
                 }
             }
             // Calculate new j by Eulerian form of Euler Equations using RK4 method for more accurate approximation
